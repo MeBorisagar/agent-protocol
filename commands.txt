@@ -1,0 +1,8 @@
+server protocol 
+uvicorn server.api.main:app --reload --port 8000
+
+agent B
+uvicorn apps.agent_b.main:app --reload --port 8002
+
+agent A
+python apps/agent_a/main.py
