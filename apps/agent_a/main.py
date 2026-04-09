@@ -1,7 +1,7 @@
 import httpx
 import uuid
 
-SERVER_URL = "http://localhost:8000"
+SERVER_URL = "http://localhost:8003"
 
 
 def register():
