@@ -6,3 +6,27 @@ uvicorn apps.agent_b.main:app --reload --port 8002
 
 agent A
 python apps/agent_a/main.py
+
+AGENT_REGISTRY = {
+    "agent_a": "http://localhost:8001",
+    "agent_b": "http://localhost:8002",
+
+}
+
+
+redis-server
+
+uvicorn server.api.main:app --reload --port 8000
+
+uvicorn apps.agent_b.main:app --reload --port 8002
+
+curl -X POST http://localhost:8000/register \
+-H "Content-Type: application/json" \
+-d '{
+  "name": "agent_b",
+  "url": "http://localhost:8002"
+}'
+
+python protocol/workers/worker.py
+
+python apps/agent_a/main.py

@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from protocol.schemas.message import BaseMessage
 from protocol.schemas.registry import AgentInfo
-from protocol.core.router import MessageRouter
 from protocol.store.task_store import TaskStore
 from protocol.schemas.task import TaskStatus
+from protocol.queue.redis_queue import enqueue_task
+from protocol.registry.capability_registry import CapabilityRegistry
 
 import uuid
+import httpx
 
 app = FastAPI()
 
@@ -14,35 +16,49 @@ AGENT_REGISTRY = {
     "agent_b": "http://localhost:8002",
 
 }
-router = MessageRouter(AGENT_REGISTRY)
 task_store = TaskStore()
+capability_registry = CapabilityRegistry()
 
 
 @app.post("/register")
-def register(agent: AgentInfo):
+async def register(agent: AgentInfo):
+    """
+    Agent registers itself + capabilities
+    """
+
     AGENT_REGISTRY[agent.name] = agent.url
-    return {"status": "registered"}
+
+    # Fetch capabilities from agent
+    async with httpx.AsyncClient() as client:
+        res = await client.get(f"{agent.url}/capabilities")
+        capabilities = res.json()
+
+    # Register capabilities
+    capability_registry.register(agent.name, agent.url, capabilities)
+
+    return {"status": "registered", "capabilities": capabilities}
+
+
+@app.get("/capabilities")
+def list_capabilities():
+    return capability_registry.capability_map
 
 
 @app.post("/message")
 async def route_message(msg: BaseMessage):
 
-    #  Create task
     task_id = str(uuid.uuid4())
     task_store.create_task(task_id)
 
-    # attach task_id to metadata
     if not msg.metadata:
         msg.metadata = {}
 
     msg.metadata["task_id"] = task_id
 
-    # mark accepted
     task_store.update_status(task_id, TaskStatus.ACCEPTED)
 
-    # async fire-and-forget
-    import asyncio
-    asyncio.create_task(process_message(msg, task_id))
+    # push to queue
+    enqueue_task(msg.model_dump())
 
     return {
         "status": "accepted",
@@ -50,26 +66,6 @@ async def route_message(msg: BaseMessage):
     }
 
 
-async def process_message(msg: BaseMessage, task_id: str):
-    try:
-        task_store.update_status(task_id, TaskStatus.RUNNING)
-
-        response = await router.route(msg)
-        
-        if response :
-
-            task_store.complete_task(task_id, response)
-        else:
-           
-            task_store.fail_task(task_id, "No response from router")
-    except Exception as e:
-        
-        task_store.fail_task(task_id, str(e))
-
-
 @app.get("/tasks/{task_id}")
 def get_task(task_id: str):
-    task = task_store.get_task(task_id)
-    if not task:
-        return {"error": "Task not found"}
-    return task
+    return task_store.get_task(task_id)

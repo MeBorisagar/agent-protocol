@@ -5,6 +5,18 @@ import asyncio
 app = FastAPI()
 
 
+@app.get("/capabilities")
+def capabilities():
+    return [
+        {
+            "name": "task.execute",
+            "description": "Execute a task",
+            "input_schema": {},
+            "output_schema": {}
+        }
+    ]
+
+
 @app.post("/receive")
 async def receive(msg: BaseMessage):
 
@@ -12,15 +24,13 @@ async def receive(msg: BaseMessage):
 
         if msg.action == "task.execute":
 
-            # simulate long task
-           
             await asyncio.sleep(5)
 
             return {
                 "type": "RESPONSE",
                 "action": "task.execute",
                 "payload": {
-                    "result": "Processed async task"
+                    "result": f"Executed by Agent B"
                 }
             }
 

@@ -1,30 +1,35 @@
-from typing import Dict
-from protocol.schemas.task import Task, TaskStatus
+import redis
+import json
+from protocol.schemas.task import TaskStatus
+
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
 
 class TaskStore:
-    def __init__(self):
-        self.tasks: Dict[str, Task] = {}
 
     def create_task(self, task_id: str):
-        self.tasks[task_id] = Task(
-            task_id=task_id,
-            status=TaskStatus.PENDING
-        )
+        r.set(task_id, json.dumps({
+            "task_id": task_id,
+            "status": TaskStatus.PENDING
+        }))
 
     def update_status(self, task_id: str, status: TaskStatus):
-       
-        self.tasks[task_id].status = status
+        task = json.loads(r.get(task_id))
+        task["status"] = status
+        r.set(task_id, json.dumps(task))
 
     def complete_task(self, task_id: str, result: dict):
-        
-        self.tasks[task_id].status = TaskStatus.COMPLETED
-        self.tasks[task_id].result = result
+        task = json.loads(r.get(task_id))
+        task["status"] = TaskStatus.COMPLETED
+        task["result"] = result
+        r.set(task_id, json.dumps(task))
 
     def fail_task(self, task_id: str, error: str):
-       
-        self.tasks[task_id].status = TaskStatus.FAILED
-        self.tasks[task_id].error = error
+        task = json.loads(r.get(task_id))
+        task["status"] = TaskStatus.FAILED
+        task["error"] = error
+        r.set(task_id, json.dumps(task))
 
     def get_task(self, task_id: str):
-        return self.tasks.get(task_id)
+        data = r.get(task_id)
+        return json.loads(data) if data else None
