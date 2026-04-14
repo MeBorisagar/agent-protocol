@@ -12,7 +12,7 @@ class MessageRouter:
         if not receiver_url:
             return {"error": "Unknown receiver"}
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{receiver_url}/receive",
                 json=msg.model_dump()

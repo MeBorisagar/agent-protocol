@@ -1,39 +1,37 @@
 import httpx
-import uuid
+import time
 
-SERVER_URL = "http://localhost:8003"
-
-
-def register():
-    httpx.post(f"{SERVER_URL}/register", json={
-        "name": "agent_a",
-        "url": "http://localhost:8001"
-    })
-
-
-def discover_capabilities():
-    res = httpx.get("http://localhost:8002/capabilities")
-    return res.json()
+SERVER = "http://localhost:8000"
 
 
 def send_task():
     msg = {
-        "message_id": str(uuid.uuid4()),
         "sender": "agent_a",
         "receiver": "agent_b",
         "type": "REQUEST",
         "action": "task.execute",
         "payload": {
-            "task_id": "task-123",
-            "description": "analyze logs"
+            "task_id": "t1",
+            "description": "heavy processing"
         }
     }
 
-    res = httpx.post(f"{SERVER_URL}/message", json=msg)
-    print(res.json())
+    res = httpx.post(f"{SERVER}/message", json=msg)
+    data = res.json()
+
+    task_id = data["task_id"]
+    print("Task submitted:", task_id)
+
+    # Poll
+    while True:
+        status = httpx.get(f"{SERVER}/tasks/{task_id}").json()
+        print("Status:", status)
+
+        if status["status"] in ["COMPLETED", "FAILED"]:
+            break
+
+        time.sleep(2)
 
 
 if __name__ == "__main__":
-    register()
-    print("Capabilities:", discover_capabilities())
     send_task()
